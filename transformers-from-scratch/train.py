@@ -150,3 +150,56 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
             break
     
     return decoder_input.squeeze(0)
+
+
+def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, device, print_msg, global_step, writer, num_examples=2):
+    """
+    Runs validation on a trained transformer model and computes various performance metrics.
+    
+    Args:
+        model: The transformer model to validate
+        validation_ds: DataLoader containing validation examples
+        tokenizer_src: Tokenizer for source language
+        tokenizer_tgt: Tokenizer for target language
+        max_len (int): Maximum sequence length for generation
+        device: Computing device (cuda/cpu)
+        print_msg: Function for printing formatted messages
+        global_step (int): Current training step (for logging)
+        writer: TensorBoard writer object for metric logging
+        num_examples (int, optional): Number of examples to validate. Defaults to 2.
+    
+    Process:
+        1. Sets model to evaluation mode
+        2. Iterates through validation dataset:
+           - Processes input sequences
+           - Generates translations using greedy decoding
+           - Collects source, target, and predicted texts
+           - Prints formatted comparisons
+        3. If TensorBoard writer is provided:
+           - Computes Character Error Rate (CER)
+           - Computes Word Error Rate (WER)
+           - Computes BLEU Score
+           - Logs all metrics to TensorBoard
+    
+    Notes:
+        - Uses no_grad() for efficient inference
+        - Requires batch size of 1 for validation
+        - Attempts to format output based on console width
+        - Early stops after num_examples
+        
+    Metrics Logged:
+        - Character Error Rate (CER): Character-level accuracy
+        - Word Error Rate (WER): Word-level accuracy
+        - BLEU Score: Standard machine translation quality metric
+    
+    Example Output Format:
+        ----------------------------------------
+        SOURCE:     [source text]
+        TARGET:     [target text]
+        PREDICTED:  [predicted text]
+        ----------------------------------------
+    """
+    
+    model.eval()
+    count = 0
+

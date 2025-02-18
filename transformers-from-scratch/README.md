@@ -1,0 +1,124 @@
+DAY 2
+"""
+torchmetrics.CharErrorRate()
+
+Computes the Character Error Rate between predicted and target texts.
+
+Formula: CER = (S + D + I) / N
+- S: Number of character substitutions
+- D: Number of character deletions
+- I: Number of character insertions
+- N: Total number of characters in reference
+
+Example:
+    >>> cer = torchmetrics.CharErrorRate()
+    >>> pred = ["helllo world"]
+    >>> target = ["hello world"]
+    >>> cer(pred, target)  # Returns: 0.1 (1 insertion / 10 chars)
+
+https://lightning.ai/docs/torchmetrics/stable/text/char_error_rate.html
+
+"""
+
+"""
+torchmetrics.WordErrorRate()
+
+Computes the Word Error Rate between predicted and target texts.
+
+Formula: WER = (S + D + I) / N
+- S: Number of word substitutions
+- D: Number of word deletions
+- I: Number of word insertions
+- N: Total number of words in reference
+
+Example:
+    >>> wer = torchmetrics.WordErrorRate()
+    >>> pred = ["the quick brown fox jumps"]
+    >>> target = ["the fast brown fox jumped"]
+    >>> wer(pred, target)  # Returns: 0.4 (2 substitutions / 5 words)
+
+
+Example:
+    >>> from torchmetrics.text import WordErrorRate 
+    >>> preds = ["there is an other sample"] 
+    >>> target = ["there is another one"] 
+    >>> wer = WordErrorRate() 
+    >>> wer(preds, target) 
+    tensor(0.7500)
+
+**<contemplator>**
+
+Let me break down how WordErrorRate is calculated for this specific example...
+
+The input strings are:
+- Prediction: "there is an other sample"
+- Target: "there is another one"
+
+First, let's split into words:
+- Prediction: ["there", "is", "an", "other", "sample"]
+- Target: ["there", "is", "another", "one"]
+
+Now, let me count the words:
+- Prediction: 5 words
+- Target: 4 words
+
+Let me identify the operations needed to transform prediction into target:
+1. "there" - match (no operation)
+2. "is" - match (no operation)
+3. "an other" needs to become "another"
+   - Delete "an"
+   - Delete "other"
+   - Insert "another"
+4. "sample" needs to become "one"
+   - Substitute "sample" with "one"
+
+Let's count the operations:
+- Substitutions (S) = 1 ("sample" → "one")
+- Deletions (D) = 2 ("an" and "other" are deleted)
+- Insertions (I) = 1 ("another" is inserted)
+
+The formula is:
+```
+WER = (S + D + I) / N
+Where N is the number of words in the target
+```
+
+Plugging in our numbers:
+```
+WER = (1 + 2 + 1) / 4
+    = 4 / 4
+    = 0.75
+```
+
+This is why we get:
+```python
+tensor(0.7500)
+```
+
+</contemplator>
+
+**<final_answer>**
+
+The Word Error Rate of 0.75 (75%) for the given example is calculated as follows:
+
+1. Total Operations Needed:
+   - Substitutions: 1 ("sample" → "one")
+   - Deletions: 2 ("an" and "other")
+   - Insertions: 1 ("another")
+   - Total Operations: 4
+
+2. Reference Length:
+   - Target sentence has 4 words
+
+3. Final Calculation:
+   - WER = (S + D + I) / N
+   - WER = (1 + 2 + 1) / 4
+   - WER = 4 / 4
+   - WER = 0.75 or 75%
+
+The high error rate (0.75) indicates significant differences between the predicted and target sequences, which is accurate given that only the first two words match exactly.
+
+
+https://lightning.ai/docs/torchmetrics/stable/text/word_error_rate.html
+"""
+
