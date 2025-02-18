@@ -1,6 +1,6 @@
 DAY 2
-"""
-torchmetrics.CharErrorRate()
+
+** torchmetrics.CharErrorRate() **
 
 Computes the Character Error Rate between predicted and target texts.
 
@@ -18,10 +18,9 @@ Example:
 
 https://lightning.ai/docs/torchmetrics/stable/text/char_error_rate.html
 
-"""
+<br>
 
-"""
-torchmetrics.WordErrorRate()
+** torchmetrics.WordErrorRate() **
 
 Computes the Word Error Rate between predicted and target texts.
 
@@ -120,5 +119,5 @@ The high error rate (0.75) indicates significant differences between the predict
 
 
 https://lightning.ai/docs/torchmetrics/stable/text/word_error_rate.html
-"""
+
 
