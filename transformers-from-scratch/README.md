@@ -121,3 +121,41 @@ The high error rate (0.75) indicates significant differences between the predict
 https://lightning.ai/docs/torchmetrics/stable/text/word_error_rate.html
 
 
+"""
+torchmetrics.BLEUScore()
+
+Computes the BLEU (Bilingual Evaluation Understudy) score for machine translation evaluation.
+
+Key Components:
+1. N-gram Precision:
+   - Counts matching n-grams between prediction and reference
+   - Usually uses n=1,2,3,4 (unigram to 4-gram)
+   - Each n-gram level gets a precision score
+
+2. Brevity Penalty:
+   - Penalizes translations that are too short
+   - BP = min(1, exp(1 - reference_length/prediction_length))
+
+3. Final Score:
+   - Geometric mean of n-gram precisions
+   - Multiplied by brevity penalty
+   - Range: 0 to 1 (higher is better)
+
+Usage:
+    >>> metric = torchmetrics.BLEUScore()
+    >>> predictions = ["the cat sat on the mat"]
+    >>> references = ["the cat sits on the mat"]
+    >>> score = metric(predictions, references)
+
+Options:
+    - weights: Weights for different n-gram levels
+    - smooth: Apply smoothing for better scores with short sequences
+    - n_gram: Maximum n-gram length to consider
+
+Advantages:
+    - Correlates with human judgment
+    - Language-independent
+    - Supports multiple references
+    - Fast computation
+    - Industry standard for MT evaluation
+"""
