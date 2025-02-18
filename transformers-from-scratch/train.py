@@ -198,6 +198,7 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
         TARGET:     [target text]
         PREDICTED:  [predicted text]
         ----------------------------------------
+    Read Day 2 in Readme for more detailed explanation.
     """
     
     model.eval()
@@ -263,5 +264,21 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
         writer.flush()
 
 
+def get_all_sentences(ds, lang):
+    for item in ds:
+        yield item['translation'][lang]
 
 
+def get_or_build_tokenizer(config, ds, lang):
+    tokenizer_path = Path(config['tokenizer_file'].format(lang))
+
+    if not Path.exists(tokenizer_path):
+        tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
+        tokenizer.pre_tokenizer = Whitespace()
+        trainer = WordLevelTrainer(special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"], min_frequency=2)
+        tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer)
+        tokenizer.save(str(tokenizer_path))
+    else:
+        tokenizer = Tokenizer.from_file(str(tokenizer_path))
+    return tokenizer
+    
