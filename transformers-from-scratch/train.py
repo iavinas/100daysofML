@@ -269,16 +269,90 @@ def get_all_sentences(ds, lang):
         yield item['translation'][lang]
 
 
-def get_or_build_tokenizer(config, ds, lang):
-    tokenizer_path = Path(config['tokenizer_file'].format(lang))
-
-    if not Path.exists(tokenizer_path):
-        tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
-        tokenizer.pre_tokenizer = Whitespace()
-        trainer = WordLevelTrainer(special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"], min_frequency=2)
-        tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer)
-        tokenizer.save(str(tokenizer_path))
-    else:
-        tokenizer = Tokenizer.from_file(str(tokenizer_path))
-    return tokenizer
+def get_or_build_tokenizers(config, ds):
+    """Build both tokenizers with guaranteed same IDs for special tokens"""
+    special_tokens = ["[UNK]", "[PAD]", "[SOS]", "[EOS]"]
+    src_lang = config['lang_src']
+    tgt_lang = config['lang_tgt']
     
+    # Create or load tokenizers
+    src_tokenizer_path = Path(config['tokenizer_file'].format(src_lang))
+    tgt_tokenizer_path = Path(config['tokenizer_file'].format(tgt_lang))
+    
+    # Create new tokenizers if they don't exist
+    if not Path.exists(src_tokenizer_path) or not Path.exists(tgt_tokenizer_path):
+        # Initialize both tokenizers the same way
+        src_tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
+        tgt_tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
+        
+        src_tokenizer.pre_tokenizer = Whitespace()
+        tgt_tokenizer.pre_tokenizer = Whitespace()
+        
+        # Train both tokenizers
+        src_trainer = WordLevelTrainer(special_tokens=special_tokens, min_frequency=2)
+        tgt_trainer = WordLevelTrainer(special_tokens=special_tokens, min_frequency=2)
+        
+        src_tokenizer.train_from_iterator(get_all_sentences(ds, src_lang), trainer=src_trainer)
+        tgt_tokenizer.train_from_iterator(get_all_sentences(ds, tgt_lang), trainer=tgt_trainer)
+        
+        # Manually ensure special tokens have the same IDs in both tokenizers
+        # This is the key part - we modify the vocabulary mapping
+        for i, token in enumerate(special_tokens):
+            # Force special tokens to have IDs 0,1,2,3
+            src_tokenizer.token_to_id_[token] = i
+            tgt_tokenizer.token_to_id_[token] = i
+            
+            # Update the reverse mapping too
+            src_tokenizer.id_to_token_[i] = token
+            tgt_tokenizer.id_to_token_[i] = token
+        
+        # Save the tokenizers
+        src_tokenizer.save(str(src_tokenizer_path))
+        tgt_tokenizer.save(str(tgt_tokenizer_path))
+    else:
+        # Load existing tokenizers
+        src_tokenizer = Tokenizer.from_file(str(src_tokenizer_path))
+        tgt_tokenizer = Tokenizer.from_file(str(tgt_tokenizer_path))
+        
+        # Verify special tokens have the same IDs
+        for token in special_tokens:
+            src_id = src_tokenizer.token_to_id(token)
+            tgt_id = tgt_tokenizer.token_to_id(token)
+            if src_id != tgt_id:
+                raise ValueError(f"Tokenizers have different IDs for {token}: {src_id} vs {tgt_id}")
+    
+    return src_tokenizer, tgt_tokenizer
+    
+
+def get_ds(config):
+    ds_raw = load_dataset(f"{config['datasource']}", f"{config['lang_src']}-{config['lang_tgt']}", split='train')
+
+    # build tokenizers
+    tokenizer_src, tokenizer_tgt = get_or_build_tokenizer(config, ds_raw)
+
+    train_ds_size = int(0.9 * len(ds_raw))
+    val_ds_size = len(ds_raw) - train_ds_size
+    train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
+
+
+    train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
+    val_ds = BilingualDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
+
+    max_len_src = 0
+    max_len_tgt = 0
+
+    for item in ds_raw:
+        src_ids = tokenizer_src.encode(item['translation'][config['lang_src']]).ids
+        tgt_ids = tokenizer_tgt.encode(item['translation'][config['lang_tgt']]).ids
+        max_len_src = max(max_len_src, len(src_ids))
+        max_len_tgt = max(max_len_tgt, len(tgt_ids))
+
+    print(f'Max length of source sentence: {max_len_src}')
+    print(f'Max length of target sentence: {max_len_tgt}')
+
+    train_dataloader = DataLoader(train_ds, batch_size = config['batch_size'], shuffle=True)
+    val_dataloader = DataLoader(val_ds, batch_size=1, shuffle=True)
+
+    return train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt
+
+def 
