@@ -361,6 +361,140 @@ def get_model(config, vocab_src_len, vocal_tgt_len):
 
 
 def train(config):
+    """
+        Processes a batch of data through a transformer model's encoder-decoder architecture and calculates loss.
+        
+        This function implements the core forward pass of a sequence-to-sequence transformer model, 
+        following the standard encoder-decoder architecture with self-attention mechanisms.
+        
+        Parameters:
+        -----------
+        model : nn.Module
+            The transformer model containing encode, decode, and project methods
+        encoder_input : torch.Tensor
+            Input sequence to the encoder with shape (batch_size, seq_len)
+            Contains token IDs of the source sequence (e.g., the sentence to translate)
+        decoder_input : torch.Tensor
+            Input sequence to the decoder with shape (batch_size, seq_len)
+            Contains token IDs of the target sequence, typically right-shifted
+            (start token followed by target sequence except last token)
+        encoder_mask : torch.Tensor
+            Attention mask for the encoder with shape (batch_size, 1, 1, seq_len)
+            Prevents attention to padding tokens in the source sequence by setting their positions to 0
+        decoder_mask : torch.Tensor
+            Combined padding and causal mask for the decoder with shape (batch_size, 1, seq_len, seq_len)
+            Contains both padding mask (to prevent attending to pad tokens) and
+            causal/look-ahead mask (to prevent attending to future tokens during training)
+        labels : torch.Tensor
+            Ground truth token IDs with shape (batch_size, seq_len)
+            Contains the expected next tokens at each position (target sequence shifted left)
+        loss_fn : nn.Module
+            Loss function, typically CrossEntropyLoss with label smoothing and padding token ignored
+        device : torch.device
+            Device (CPU, GPU, MPS) where computation is performed
+            
+        Returns:
+        --------
+        loss : torch.Tensor
+            Scalar tensor containing the computed loss value
+        proj_output : torch.Tensor
+            Model predictions with shape (batch_size, seq_len, vocab_size)
+            Contains logits over the vocabulary for each position
+            
+        Detailed Process:
+        ----------------
+        1. Encoder Stage:
+            The encoder transforms the input sequence into contextual representations through
+            several transformer encoder layers. Each encoder layer consists of:
+            - Multi-head self-attention: Allows each position to attend to all positions in the input
+            - Position-wise feed-forward network: Applies the same feed-forward network to each position
+            - Layer normalization and residual connections: Stabilize training
+            
+            During encoding:
+            - Input tokens are embedded into vectors (embedding lookup)
+            - Positional encodings are added to provide position information
+            - The encoder_mask ensures padding tokens don't contribute to attention calculations
+            - Output shape: (batch_size, seq_len, d_model), where d_model is the model's hidden dimension
+        
+        2. Decoder Stage:
+            The decoder processes the target sequence while attending to the encoder's output.
+            Each decoder layer contains:
+            - Masked multi-head self-attention: Allows each position to attend only to previous positions
+            - Multi-head cross-attention: Attends to the encoder's output
+            - Position-wise feed-forward network: Same as in encoder
+            - Layer normalization and residual connections: Same as in encoder
+            
+            During decoding:
+            - The decoder_mask prevents attention to:
+                a) Future tokens (causal/look-ahead mask)
+                b) Padding tokens in both source and target sequences
+            - The decoder layers build target representations with knowledge of the source sequence
+            - Output shape: (batch_size, seq_len, d_model)
+        
+        3. Projection Stage:
+            The projection layer converts decoder outputs into vocabulary predictions:
+            - Applies a linear transformation: d_model → vocab_size
+            - Maps hidden representations to logits over the vocabulary
+            - No activation function is applied (raw logits are used with CrossEntropyLoss)
+            - Output shape: (batch_size, seq_len, vocab_size)
+        
+        4. Loss Calculation:
+            The loss function measures prediction accuracy against ground truth:
+            - Reshapes predictions to (batch_size×seq_len, vocab_size)
+            - Reshapes labels to (batch_size×seq_len)
+            - Computes cross-entropy loss between predictions and labels
+            - Ignores loss contribution from padding tokens
+            - Applies label smoothing to prevent overconfidence and improve generalization
+            
+        Why Cross-Entropy Loss for Language Modeling:
+        --------------------------------------------
+        Cross-entropy is the standard loss function for language modeling despite language being expressible 
+        in multiple ways, for several important reasons:
+        
+        1. Probabilistic Nature of Language:
+            - Language generation is inherently probabilistic - multiple valid continuations exist for any context
+            - Cross-entropy measures the difference between predicted probability distributions and ground truth
+            - It allows the model to assign probability mass to multiple plausible next tokens
+        
+        2. Mathematical Properties:
+            - Minimizing cross-entropy is equivalent to maximizing the likelihood of the training data
+            - It's the natural loss function derived from maximum likelihood estimation
+            - It has beneficial gradients that become larger for more confident incorrect predictions
+        
+        3. Handling Multiple Valid Outputs:
+            - Label smoothing (as used in this implementation) explicitly acknowledges multiple valid continuations
+            - Instead of forcing 100% probability on one "correct" token, it reserves small probability for alternatives
+            - This prevents the model from becoming overconfident and improves generalization
+        
+        4. Vocabulary as a Discrete Space:
+            - Language modeling treats text generation as classification over a discrete vocabulary
+            - Cross-entropy is the standard loss for multi-class classification problems
+            - Alternative losses like MSE are inappropriate for discrete classification tasks
+        
+        5. Information Theory Connection:
+            - Cross-entropy connects to information theory concepts of entropy and KL-divergence
+            - It measures how many bits would be needed to encode the true distribution using the predicted distribution
+            - This aligns with the goal of language modeling: finding the most probable continuation
+        
+        6. Practical Effectiveness:
+            - Empirically, cross-entropy has proven highly effective for language modeling
+            - It works well with teacher forcing (using ground truth as input during training)
+            - It handles the sparse nature of language (most tokens are incorrect at any position)
+        
+        Alternative approaches like reinforcement learning or minimum risk training are sometimes used as 
+        additional fine-tuning steps, but cross-entropy remains the foundation for basic language model training.
+        
+        Implementation Note:
+        -------------------
+        The cross-entropy loss combines both the softmax function and negative log-likelihood in one operation.
+        It's numerically more stable than applying softmax and then calculating loss separately.
+        
+        Training Objective:
+        ------------------
+        The objective is to minimize this loss, which represents how well the model predicts
+        the next token at each position given the source sequence and previous target tokens.
+        This matches the autoregressive nature of sequence generation during inference.
+    """
     device = 'cuda' if torch.cuda.is_available() else "mps" if torch.has_mps or torch.backends.mps.is_available() else "cpu"
     print("Using device:", device)
 
